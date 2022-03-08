@@ -7,6 +7,7 @@ sealed class CorrectionServiceResult {
         class AccountDoesNotExist(val accountUUID: UUID): Failed()
         class NotEnoughMoney(val accountUUID: UUID): Failed()
         class NegativeDelta(val delta: Int): Failed()
+        class TransactionAlreadyExists(val transactionUUID: UUID): Failed()
     }
 
     sealed class Success: CorrectionServiceResult() {

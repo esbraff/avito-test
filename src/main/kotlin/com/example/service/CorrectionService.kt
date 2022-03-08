@@ -8,7 +8,13 @@ import com.example.models.Correction
 import java.util.UUID
 
 class CorrectionService(private val accountDAO: AccountDAO, private val transactionDAO: TransactionDAO) {
-    suspend fun creditMoney(accountUUID: UUID, amount: Int): CorrectionServiceResult = dbQuery {
+    suspend fun creditMoney(accountUUID: UUID, amount: Int, idempotencyCode: UUID): CorrectionServiceResult = dbQuery {
+        val transaction = transactionDAO.findTransactionByUUID(idempotencyCode)
+
+        if (transaction != null) {
+            return@dbQuery CorrectionServiceResult.Failed.TransactionAlreadyExists(idempotencyCode)
+        }
+
         val account = accountDAO.findAccountByUUID(accountUUID)
 
         if (account == null) {
@@ -20,12 +26,18 @@ class CorrectionService(private val accountDAO: AccountDAO, private val transact
         }
 
         accountDAO.updateAccountByUUID(Account(balance = (account?.balance ?: 0) + amount, uuid = accountUUID))
-        transactionDAO.createCorrection(Correction(delta = amount, accountUUID = accountUUID))
+        transactionDAO.createCorrection(Correction(delta = amount, accountUUID = accountUUID, uuid = idempotencyCode))
 
         return@dbQuery CorrectionServiceResult.Success.Credited(accountUUID, amount)
     }
 
-    suspend fun chargeOffMoney(accountUUID: UUID, amount: Int): CorrectionServiceResult = dbQuery {
+    suspend fun chargeOffMoney(accountUUID: UUID, amount: Int, idempotencyCode: UUID): CorrectionServiceResult = dbQuery {
+        val transaction = transactionDAO.findTransactionByUUID(idempotencyCode)
+
+        if (transaction != null) {
+            return@dbQuery CorrectionServiceResult.Failed.TransactionAlreadyExists(idempotencyCode)
+        }
+
         val account = accountDAO.findAccountByUUID(accountUUID)
 
         if (amount < 0) {
@@ -41,7 +53,7 @@ class CorrectionService(private val accountDAO: AccountDAO, private val transact
         }
 
         accountDAO.updateAccountByUUID(Account(balance = account.balance - amount, uuid = accountUUID))
-        transactionDAO.createCorrection(Correction(delta = -amount, accountUUID = accountUUID))
+        transactionDAO.createCorrection(Correction(delta = -amount, accountUUID = accountUUID, uuid = idempotencyCode))
 
         return@dbQuery CorrectionServiceResult.Success.ChargedOff(accountUUID, amount)
     }

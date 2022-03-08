@@ -11,8 +11,15 @@ class TransferService(private val accountDAO: AccountDAO, private val transactio
     suspend fun makeTransfer(
         senderUUID: UUID,
         receiverUUID: UUID,
-        amount: Int
+        amount: Int,
+        idempotencyCode: UUID
     ): TransferServiceResult = dbQuery {
+        val transaction = transactionDAO.findTransactionByUUID(idempotencyCode)
+
+        if (transaction != null) {
+            return@dbQuery TransferServiceResult.Failed.TransactionAlreadyExists(idempotencyCode)
+        }
+
         val receiver = accountDAO.findAccountByUUID(receiverUUID)
         val sender = accountDAO.findAccountByUUID(senderUUID)
             ?: return@dbQuery TransferServiceResult.Failed.SenderDoesNotExist(senderUUID)
@@ -32,7 +39,9 @@ class TransferService(private val accountDAO: AccountDAO, private val transactio
         }
 
         accountDAO.updateAccountByUUID(Account(balance = sender.balance - amount, uuid = senderUUID))
-        transactionDAO.createTransfer(Transfer(delta = amount, senderUUID = senderUUID, receiverUUID = receiverUUID))
+        transactionDAO.createTransfer(
+            Transfer(delta = amount, senderUUID = senderUUID, receiverUUID = receiverUUID, uuid = idempotencyCode)
+        )
 
         return@dbQuery TransferServiceResult.Success(senderUUID, receiverUUID, amount)
     }

@@ -66,7 +66,20 @@ fun Application.module(testing: Boolean = false) {
                 }
             }
 
-            when (val correctionServiceResult = correctionService.creditMoney(accountUUID, amount)) {
+            val idempotencyCode = try {
+                UUID.fromString(call.request.queryParameters["idempotencyCode"])
+            } catch (e: Exception) {
+                when (e) {
+                    is IllegalArgumentException,
+                    is NullPointerException -> {
+                        call.respond(HttpStatusCode.BadRequest, "Invalid idempotency code")
+                        return@get
+                    }
+                    else -> throw e
+                }
+            }
+
+            when (val correctionServiceResult = correctionService.creditMoney(accountUUID, amount, idempotencyCode)) {
                 is CorrectionServiceResult.Failed.AccountDoesNotExist -> {
                     call.respond(HttpStatusCode.BadRequest, "Account does not exist")
                 }
@@ -74,6 +87,12 @@ fun Application.module(testing: Boolean = false) {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         "Can't make transaction with negative amount of money"
+                    )
+                }
+                is CorrectionServiceResult.Failed.TransactionAlreadyExists -> {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        "Transaction already exists"
                     )
                 }
                 is CorrectionServiceResult.Success.Credited -> {
@@ -96,6 +115,19 @@ fun Application.module(testing: Boolean = false) {
                 }
             }
 
+            val idempotencyCode = try {
+                UUID.fromString(call.request.queryParameters["idempotencyCode"])
+            } catch (e: Exception) {
+                when (e) {
+                    is IllegalArgumentException,
+                    is NullPointerException -> {
+                        call.respond(HttpStatusCode.BadRequest, "Invalid idempotency code")
+                        return@get
+                    }
+                    else -> throw e
+                }
+            }
+
             val amount = try {
                 call.request.queryParameters["amount"]!!.toInt()
             } catch (e: Exception) {
@@ -109,7 +141,7 @@ fun Application.module(testing: Boolean = false) {
                 }
             }
 
-            when (val correctionServiceResult = correctionService.chargeOffMoney(accountUUID, amount)) {
+            when (val correctionServiceResult = correctionService.chargeOffMoney(accountUUID, amount, idempotencyCode)) {
                 is CorrectionServiceResult.Failed.AccountDoesNotExist -> {
                     call.respond(HttpStatusCode.BadRequest, "Account does not exist")
                 }
@@ -123,6 +155,12 @@ fun Application.module(testing: Boolean = false) {
                     call.respond(
                         HttpStatusCode.PreconditionFailed,
                         "Account does not have enough money"
+                    )
+                }
+                is CorrectionServiceResult.Failed.TransactionAlreadyExists -> {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        "Transaction already exists"
                     )
                 }
                 is CorrectionServiceResult.Success.ChargedOff -> {
@@ -171,7 +209,20 @@ fun Application.module(testing: Boolean = false) {
                 }
             }
 
-            when (val transferServiceResult = transferService.makeTransfer(senderUUID, receiverUUID, amount)) {
+            val idempotencyCode = try {
+                UUID.fromString(call.request.queryParameters["idempotencyCode"])
+            } catch (e: Exception) {
+                when (e) {
+                    is IllegalArgumentException,
+                    is NullPointerException -> {
+                        call.respond(HttpStatusCode.BadRequest, "Invalid idempotency code")
+                        return@get
+                    }
+                    else -> throw e
+                }
+            }
+
+            when (val transferServiceResult = transferService.makeTransfer(senderUUID, receiverUUID, amount, idempotencyCode)) {
                 is TransferServiceResult.Failed.NegativeDelta -> {
                     call.respond(
                         HttpStatusCode.BadRequest,
@@ -186,6 +237,12 @@ fun Application.module(testing: Boolean = false) {
                 }
                 is TransferServiceResult.Failed.SenderDoesNotExist -> {
                     call.respond(HttpStatusCode.BadRequest, "Sender does not exist")
+                }
+                is TransferServiceResult.Failed.TransactionAlreadyExists -> {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        "Transaction already exists"
+                    )
                 }
                 is TransferServiceResult.Success -> {
                     call.respond(HttpStatusCode.OK, "Successfully transferred money")
