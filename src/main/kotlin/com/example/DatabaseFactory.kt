@@ -6,6 +6,7 @@ import com.zaxxer.hikari.HikariDataSource
 import io.ktor.server.config.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.flywaydb.core.Flyway
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.transactions.transaction
 import java.sql.Connection
@@ -18,6 +19,8 @@ object DatabaseFactory {
 
     fun init() {
         Database.connect(hikari())
+        val flyway = Flyway.configure().dataSource(dbUrl, dbUser, dbPassword).load()
+        flyway.migrate()
     }
 
     private fun hikari(): HikariDataSource {

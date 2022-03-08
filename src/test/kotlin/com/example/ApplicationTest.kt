@@ -7,7 +7,6 @@ import io.ktor.server.response.*
 import io.ktor.server.request.*
 import kotlin.test.*
 import io.ktor.server.testing.*
-import com.example.plugins.*
 
 class ApplicationTest {
 }
